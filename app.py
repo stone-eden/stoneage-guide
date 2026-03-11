@@ -6,10 +6,10 @@ st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
 # ---------- 데이터 불러오기 ----------
 @st.cache_data
 def load_data():
-    pets = pd.read_csv("pets.csv", encoding="cp949")
-    raids = pd.read_csv("raids.csv", encoding="cp949")
-    raid_info = pd.read_csv("raid_info.csv", encoding="cp949")
-    ride_pet = pd.read_csv("ride_pet.csv", encoding="cp949")
+    pets = pd.read_csv("pets.csv", encoding="utf-8-sig")
+    raids = pd.read_csv("raids.csv", encoding="utf-8-sig")
+    raid_info = pd.read_csv("raid_info.csv", encoding="utf-8-sig")
+    ride_pet = pd.read_csv("ride_pet.csv", encoding="utf-8-sig")
 
     pets.columns = pets.columns.str.strip()
     raids.columns = raids.columns.str.strip()
@@ -440,3 +440,4 @@ st.markdown("""
 </div>
 
 """, unsafe_allow_html=True)
+
