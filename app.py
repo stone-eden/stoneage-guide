@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import os
 
 st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
 
@@ -439,4 +438,5 @@ st.markdown("""
 스톤하는 Eden 채널 바로가기
 </a>
 </div>
+
 """, unsafe_allow_html=True)
