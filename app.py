@@ -3,6 +3,8 @@ import pandas as pd
 
 st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
 
+st.write("앱 시작")
+
 # ---------- 데이터 불러오기 ----------
 @st.cache_data
 def load_data():
@@ -440,4 +442,5 @@ st.markdown("""
 </div>
 
 """, unsafe_allow_html=True)
+
 
