@@ -4,9 +4,22 @@ import os
 
 st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
 
-# CSV 불러오기
-pets_df = pd.read_csv("pets.csv", encoding="cp949")
-raids_df = pd.read_csv("raids.csv", encoding="cp949")
+# ---------- 데이터 불러오기 ----------
+@st.cache_data
+def load_data():
+    pets = pd.read_csv("pets.csv", encoding="cp949")
+    raids = pd.read_csv("raids.csv", encoding="cp949")
+    raid_info = pd.read_csv("raid_info.csv", encoding="cp949")
+    ride_pet = pd.read_csv("ride_pet.csv", encoding="cp949")
+
+    pets.columns = pets.columns.str.strip()
+    raids.columns = raids.columns.str.strip()
+    raid_info.columns = raid_info.columns.str.strip()
+    ride_pet.columns = ride_pet.columns.str.strip()
+
+    return pets, raids, raid_info, ride_pet
+
+pets_df, raids_df, raid_info_df, ride_pet_df = load_data()
 
 # ---------- 스타일 ----------
 st.markdown("""
@@ -30,16 +43,38 @@ st.markdown("""
 .badge-support {
     background-color: #27ae60;
 }
+.badge-healer {
+    background-color: #9b59b6;
+}
 .badge-beginner {
     background-color: #f39c12;
 }
 .badge-default {
     background-color: #7f8c8d;
 }
+.badge-essential {
+    background-color: #8e44ad;
+}
+.badge-recommend {
+    background-color: #16a085;
+}
+.badge-alternative {
+    background-color: #95a5a6;
+}
+.badge-easy {
+    background-color: #2ecc71;
+}
+.badge-normal {
+    background-color: #f1c40f;
+    color: black;
+}
+.badge-hard {
+    background-color: #e74c3c;
+}
 .pet-name {
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 700;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 .desc-box {
     padding: 6px 0;
@@ -52,30 +87,41 @@ st.markdown("""
     gap: 10px;
 }
 .element-label {
-    width: 70px;
+    width: 60px;
     font-weight: bold;
+    font-size: 14px;
 }
 .element-bar-wrap {
     flex: 1;
     background: #e9ecef;
     border-radius: 999px;
-    height: 16px;
+    height: 14px;
     overflow: hidden;
 }
 .element-bar {
-    height: 16px;
+    height: 14px;
     border-radius: 999px;
 }
 .element-value {
-    width: 30px;
+    width: 24px;
     text-align: right;
     font-weight: bold;
+    font-size: 14px;
+}
+.small-title {
+    font-size: 20px;
+    font-weight: 700;
+    margin-top: 8px;
+    margin-bottom: 8px;
 }
 .footer-box {
     text-align: center;
     font-size: 14px;
     color: gray;
     padding: 20px 0;
+}
+.raid-info-box {
+    padding: 10px 0 16px 0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -109,17 +155,42 @@ def get_role_badge(role):
         return '<span class="badge badge-tanker">탱커</span>'
     elif role == "보조":
         return '<span class="badge badge-support">보조</span>'
+    elif role == "힐러":
+        return '<span class="badge badge-healer">힐러</span>'
     else:
         return f'<span class="badge badge-default">{role}</span>'
 
 def get_beginner_badge(beginner_text):
-    if str(beginner_text).strip() == "예":
+    text = str(beginner_text).strip()
+    if text == "예":
         return '<span class="badge badge-beginner">초보 추천</span>'
+    elif text == "추천":
+        return '<span class="badge badge-beginner">추천</span>'
     return ""
+
+def get_recommend_badge(recommend_level):
+    level = str(recommend_level).strip()
+    if level == "필수":
+        return '<span class="badge badge-essential">필수</span>'
+    elif level == "추천":
+        return '<span class="badge badge-recommend">추천</span>'
+    elif level == "대체":
+        return '<span class="badge badge-alternative">대체</span>'
+    return f'<span class="badge badge-default">{level}</span>'
+
+def get_difficulty_badge(difficulty):
+    difficulty = str(difficulty).strip()
+    if difficulty == "쉬움":
+        return '<span class="badge badge-easy">쉬움</span>'
+    elif difficulty == "보통":
+        return '<span class="badge badge-normal">보통</span>'
+    elif difficulty == "어려움":
+        return '<span class="badge badge-hard">어려움</span>'
+    return f'<span class="badge badge-default">{difficulty}</span>'
 
 def make_element_row(label, value, color):
     value = int(value)
-    width_percent = value * 10  # 총합 10 기준
+    width_percent = value * 10
     return f"""
     <div class="element-row">
         <div class="element-label">{label}</div>
@@ -138,7 +209,6 @@ def get_element_graph(row):
 
     html = ""
 
-    # 0보다 큰 속성만 표시
     if earth > 0:
         html += make_element_row("지속성", earth, "#2ecc71")
     if water > 0:
@@ -174,7 +244,7 @@ def pet_card(pet_name):
             badge_html = get_role_badge(row["role"]) + get_beginner_badge(row["beginner_friendly"])
             st.markdown(badge_html, unsafe_allow_html=True)
 
-            st.markdown("### 속성")
+            st.markdown('<div class="small-title">속성</div>', unsafe_allow_html=True)
             st.markdown(get_element_graph(row), unsafe_allow_html=True)
 
             st.markdown(
@@ -195,26 +265,88 @@ def raid_pet_card(raid_row):
     pet_info = pets_df[pets_df["pet_name"] == pet_name]
 
     with st.container(border=True):
-        col1, col2 = st.columns([1, 3])
+        st.markdown('<div style="padding:8px 4px;">', unsafe_allow_html=True)
 
-        with col1:
+        col_img, col_info = st.columns([1, 2])
+
+        with col_img:
             show_pet_image(pet_name, width=180)
 
-        with col2:
+        with col_info:
             st.markdown(f'<div class="pet-name">{pet_name}</div>', unsafe_allow_html=True)
+
+            badge_html = get_recommend_badge(raid_row["recommend_level"])
 
             if not pet_info.empty:
                 pet_row = pet_info.iloc[0]
-
-                badge_html = get_role_badge(pet_row["role"]) + get_beginner_badge(pet_row["beginner_friendly"])
+                badge_html += get_role_badge(pet_row["role"])
+                badge_html += get_beginner_badge(pet_row["beginner_friendly"])
                 st.markdown(badge_html, unsafe_allow_html=True)
 
-                st.markdown("#### 속성")
+                st.markdown('<div class="small-title">속성</div>', unsafe_allow_html=True)
                 st.markdown(get_element_graph(pet_row), unsafe_allow_html=True)
+            else:
+                st.markdown(badge_html, unsafe_allow_html=True)
 
-            st.markdown(f'<div class="desc-box"><b>역할:</b> {raid_row["role_needed"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="desc-box"><b>필요 스킬:</b> {raid_row["required_skill"]}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="desc-box"><b>초보 팁:</b> {raid_row["beginner_tip"]}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="desc-box"><b>역할:</b> {raid_row["role_needed"]}</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f'<div class="desc-box"><b>필요 스킬:</b> {raid_row["required_skill"]}</div>',
+                unsafe_allow_html=True
+            )
+            st.markdown(
+                f'<div class="desc-box"><b>초보 팁:</b> {raid_row["beginner_tip"]}</div>',
+                unsafe_allow_html=True
+            )
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+def show_raid_info(selected_raid):
+    raid_detail = raid_info_df[raid_info_df["raid_name"] == selected_raid]
+
+    if raid_detail.empty:
+        st.info("등록된 레이드 설명이 없습니다.")
+        return
+
+    row = raid_detail.iloc[0]
+
+    with st.container(border=True):
+        st.markdown("## 레이드 설명")
+        st.markdown(get_difficulty_badge(row["difficulty"]), unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>요약:</b> {row["summary"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>핵심 팁:</b> {row["core_tip"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>추천 파티:</b> {row["party_tip"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>주의할 점:</b> {row["caution"]}</div>', unsafe_allow_html=True)
+
+def show_ride_pet_info(selected_raid):
+    ride_info = ride_pet_df[ride_pet_df["raid_name"] == selected_raid].reset_index(drop=True)
+
+    st.markdown("---")
+    st.subheader("캐릭터 역할별 추천 탑승펫")
+
+    if ride_info.empty:
+        st.info("등록된 탑승펫 정보가 없습니다.")
+        return
+
+    for i in range(0, len(ride_info), 2):
+        cols = st.columns(2)
+
+        with cols[0]:
+            with st.container(border=True):
+                row = ride_info.iloc[i]
+                st.markdown(f"### {row['character_role']}")
+                st.write(f"**추천 탑승펫:** {row['ride_pet']}")
+                st.write(f"**추천 이유:** {row['ride_reason']}")
+
+        if i + 1 < len(ride_info):
+            with cols[1]:
+                with st.container(border=True):
+                    row = ride_info.iloc[i + 1]
+                    st.markdown(f"### {row['character_role']}")
+                    st.write(f"**추천 탑승펫:** {row['ride_pet']}")
+                    st.write(f"**추천 이유:** {row['ride_reason']}")
 
 # ---------- 상단 ----------
 st.title("스톤에이지 초보용 펫 도감")
@@ -229,6 +361,11 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+st.link_button(
+    "📺 스톤하는 Eden 유튜브",
+    "https://www.youtube.com/@스톤하는Eden"
+)
+
 # ---------- 메뉴 ----------
 menu = st.sidebar.radio(
     "메뉴 선택",
@@ -242,15 +379,27 @@ if menu == "레이드별 추천 펫":
     raid_list = sorted(raids_df["raid_name"].unique().tolist())
     selected_raid = st.selectbox("레이드 선택", raid_list)
 
-    filtered = raids_df[raids_df["raid_name"] == selected_raid]
+    show_raid_info(selected_raid)
 
-    st.subheader(f"{selected_raid} 추천 펫 카드")
+    st.markdown("---")
+    st.subheader(f"{selected_raid} 추천 펫")
+
+    filtered = raids_df[raids_df["raid_name"] == selected_raid].reset_index(drop=True)
 
     if filtered.empty:
         st.warning("등록된 추천 펫이 없습니다.")
     else:
-        for _, row in filtered.iterrows():
-            raid_pet_card(row)
+        for i in range(0, len(filtered), 2):
+            cols = st.columns(2)
+
+            with cols[0]:
+                raid_pet_card(filtered.iloc[i])
+
+            if i + 1 < len(filtered):
+                with cols[1]:
+                    raid_pet_card(filtered.iloc[i + 1])
+
+    show_ride_pet_info(selected_raid)
 
 # ---------- 펫 도감 ----------
 elif menu == "펫 도감":
@@ -275,6 +424,7 @@ elif menu == "펫 도감":
             for _, row in related_raids.iterrows():
                 with st.container(border=True):
                     st.markdown(f"### {row['raid_name']}")
+                    st.markdown(f"**추천도:** {row['recommend_level']}")
                     st.markdown(f"**역할:** {row['role_needed']}")
                     st.markdown(f"**필요 스킬:** {row['required_skill']}")
                     st.markdown(f"**초보 팁:** {row['beginner_tip']}")
