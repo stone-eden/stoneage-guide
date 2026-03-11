@@ -4,13 +4,26 @@ import os
 
 st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
 
+st.write("앱 시작")
+
 # ---------- 데이터 불러오기 ----------
 @st.cache_data
 def load_data():
-    pets = pd.read_csv("pets.csv", encoding="cp949")
-    raids = pd.read_csv("raids.csv", encoding="cp949")
-    raid_info = pd.read_csv("raid_info.csv", encoding="cp949")
-    ride_pet = pd.read_csv("ride_pet.csv", encoding="cp949")
+    st.write("pets.csv 로드 시작")
+    pets = pd.read_csv("pets.csv", encoding="utf-8-sig")
+    st.write("pets.csv 성공")
+
+    st.write("raids.csv 로드 시작")
+    raids = pd.read_csv("raids.csv", encoding="utf-8-sig")
+    st.write("raids.csv 성공")
+
+    st.write("raid_info.csv 로드 시작")
+    raid_info = pd.read_csv("raid_info.csv", encoding="utf-8-sig")
+    st.write("raid_info.csv 성공")
+
+    st.write("ride_pet.csv 로드 시작")
+    ride_pet = pd.read_csv("ride_pet.csv", encoding="utf-8-sig")
+    st.write("ride_pet.csv 성공")
 
     pets.columns = pets.columns.str.strip()
     raids.columns = raids.columns.str.strip()
@@ -20,6 +33,9 @@ def load_data():
     return pets, raids, raid_info, ride_pet
 
 pets_df, raids_df, raid_info_df, ride_pet_df = load_data()
+
+st.write("전체 데이터 로드 완료")
+st.dataframe(pets_df.head())
 
 # ---------- 스타일 ----------
 st.markdown("""
@@ -439,4 +455,5 @@ st.markdown("""
 스톤하는 Eden 채널 바로가기
 </a>
 </div>
+
 """, unsafe_allow_html=True)
