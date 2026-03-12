@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import os
 
-st.set_page_config(page_title="스톤에이지 초보 도감", layout="wide")
+st.set_page_config(page_title="스톤에이지각성 초보 도감", layout="wide")
 
 # ---------- 데이터 불러오기 ----------
 @st.cache_data
@@ -17,117 +17,281 @@ def load_data():
     raid_info.columns = raid_info.columns.str.strip()
     ride_pet.columns = ride_pet.columns.str.strip()
 
+    # 숫자 컬럼 처리
+    pet_numeric_cols = [
+        "earth", "water", "fire", "wind",
+        "pre_hp", "pre_attack", "pre_defense", "pre_agility", "pre_max_total",
+        "post_hp", "post_attack", "post_defense", "post_agility", "post_total"
+    ]
+
+    for col in pet_numeric_cols:
+        if col not in pets.columns:
+            pets[col] = 0
+        pets[col] = pd.to_numeric(pets[col], errors="coerce").fillna(0)
+
+    # raid_rating 컬럼 없으면 기본값 3
+    if "raid_rating" not in pets.columns:
+        pets["raid_rating"] = 3
+    pets["raid_rating"] = pd.to_numeric(pets["raid_rating"], errors="coerce").fillna(3).astype(int)
+
+    # 환생 전 총성장 자동 계산
+    pets["pre_current_total"] = (
+        pets["pre_hp"] +
+        pets["pre_attack"] +
+        pets["pre_defense"] +
+        pets["pre_agility"]
+    ).round(3)
+
+    # 무지개 등급 가능 최소 능력치
+    pets["rainbow_required_total"] = (pets["pre_max_total"] * 0.981).round(3)
+
     return pets, raids, raid_info, ride_pet
+
 
 pets_df, raids_df, raid_info_df, ride_pet_df = load_data()
 
 # ---------- 스타일 ----------
 st.markdown("""
 <style>
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+}
+
 .badge {
     display: inline-block;
     padding: 6px 12px;
     margin-right: 8px;
     margin-bottom: 8px;
     border-radius: 999px;
-    font-size: 14px;
-    font-weight: bold;
+    font-size: 13px;
+    font-weight: 700;
     color: white;
+    line-height: 1.2;
 }
-.badge-dealer {
-    background-color: #e74c3c;
-}
-.badge-tanker {
-    background-color: #3498db;
-}
-.badge-support {
-    background-color: #27ae60;
-}
-.badge-healer {
-    background-color: #9b59b6;
-}
-.badge-beginner {
-    background-color: #f39c12;
-}
-.badge-default {
-    background-color: #7f8c8d;
-}
-.badge-essential {
-    background-color: #8e44ad;
-}
-.badge-recommend {
-    background-color: #16a085;
-}
-.badge-alternative {
-    background-color: #95a5a6;
-}
-.badge-easy {
-    background-color: #2ecc71;
-}
-.badge-normal {
-    background-color: #f1c40f;
-    color: black;
-}
-.badge-hard {
-    background-color: #e74c3c;
-}
+
+.badge-dealer { background-color: #e74c3c; }
+.badge-tanker { background-color: #3498db; }
+.badge-support { background-color: #27ae60; }
+.badge-healer { background-color: #9b59b6; }
+.badge-beginner { background-color: #f39c12; }
+.badge-default { background-color: #7f8c8d; }
+.badge-essential { background-color: #8e44ad; }
+.badge-recommend { background-color: #16a085; }
+.badge-alternative { background-color: #95a5a6; }
+.badge-easy { background-color: #2ecc71; }
+.badge-normal { background-color: #f1c40f; color: black; }
+.badge-hard { background-color: #e74c3c; }
+
 .pet-name {
-    font-size: 28px;
+    font-size: 34px;
+    font-weight: 800;
+    margin-bottom: 10px;
+    color: #1f2d3d;
+    line-height: 1.2;
+}
+
+.pet-sub-desc {
+    font-size: 15px;
+    color: #4b5563;
+    margin-top: 6px;
+    margin-bottom: 14px;
+    line-height: 1.6;
+}
+
+.info-line {
+    font-size: 15px;
+    margin-bottom: 6px;
+    line-height: 1.6;
+    color: #1f2937;
+}
+
+.info-label {
     font-weight: 700;
-    margin-bottom: 8px;
 }
-.desc-box {
-    padding: 6px 0;
-    font-size: 16px;
-}
-.element-row {
-    display: flex;
-    align-items: center;
-    margin: 8px 0;
-    gap: 10px;
-}
-.element-label {
-    width: 60px;
-    font-weight: bold;
-    font-size: 14px;
-}
-.element-bar-wrap {
-    flex: 1;
-    background: #e9ecef;
-    border-radius: 999px;
-    height: 14px;
-    overflow: hidden;
-}
-.element-bar {
-    height: 14px;
-    border-radius: 999px;
-}
-.element-value {
-    width: 24px;
-    text-align: right;
-    font-weight: bold;
-    font-size: 14px;
-}
+
 .small-title {
-    font-size: 20px;
-    font-weight: 700;
-    margin-top: 8px;
-    margin-bottom: 8px;
+    font-size: 18px;
+    font-weight: 800;
+    margin-top: 10px;
+    margin-bottom: 10px;
+    color: #1f2d3d;
 }
+
 .footer-box {
     text-align: center;
     font-size: 14px;
     color: gray;
     padding: 20px 0;
 }
+
 .raid-info-box {
-    padding: 10px 0 16px 0;
+    padding: 8px 0 12px 0;
+}
+
+.element-row {
+    display: flex;
+    align-items: center;
+    margin: 8px 0;
+    gap: 10px;
+}
+
+.element-label {
+    width: 60px;
+    font-weight: 700;
+    font-size: 14px;
+    color: #374151;
+}
+
+.element-bar-wrap {
+    flex: 1;
+    background: #eceff3;
+    border-radius: 999px;
+    height: 10px;
+    overflow: hidden;
+}
+
+.element-bar {
+    height: 10px;
+    border-radius: 999px;
+}
+
+.element-value {
+    width: 24px;
+    text-align: right;
+    font-weight: 700;
+    font-size: 13px;
+    color: #374151;
+}
+
+.stat-card {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    min-height: 220px;
+}
+
+.stat-title {
+    font-size: 17px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    color: #111827;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 15px;
+    padding: 6px 0;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-label {
+    color: #374151;
+    font-weight: 600;
+}
+
+.stat-value {
+    color: #111827;
+    font-weight: 700;
+}
+
+.total-row {
+    margin-top: 8px;
+    padding-top: 10px;
+    border-top: 1px solid #dbe2ea;
+}
+
+.total-label {
+    color: #b45309;
+    font-weight: 800;
+}
+
+.total-value {
+    color: #d97706;
+    font-weight: 800;
+}
+
+.rainbow-card {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: #fff8ef;
+    border: 1px solid #f4d7b5;
+    min-height: 220px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.rainbow-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #92400e;
+    margin-bottom: 10px;
+}
+
+.rainbow-desc {
+    font-size: 14px;
+    color: #7c5a2b;
+    line-height: 1.6;
+}
+
+.rainbow-value {
+    font-size: 30px;
+    font-weight: 900;
+    color: #d97706;
+    margin-top: 18px;
+}
+
+.summary-card {
+    padding: 16px 18px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    min-height: 220px;
+}
+
+.summary-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #111827;
+    margin-bottom: 12px;
+}
+
+.summary-section {
+    margin-bottom: 16px;
+}
+
+.summary-label {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 4px;
+}
+
+.summary-value {
+    font-size: 16px;
+    font-weight: 800;
+    color: #111827;
+}
+
+.summary-highlight {
+    color: #d97706;
+}
+
+.usage-card {
+    padding: 10px 2px 4px 2px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------- 공통 함수 ----------
-def show_pet_image(pet_name, width=220):
+def show_pet_image(pet_name, width=180):
     gif_path = f"images/{pet_name}.gif"
     png_path = f"images/{pet_name}.png"
     jpg_path = f"images/{pet_name}.jpg"
@@ -147,6 +311,54 @@ def show_pet_image(pet_name, width=220):
     else:
         st.warning("이미지가 없습니다.")
 
+def clean_text(value, default="없음"):
+    if pd.isna(value):
+        return default
+    text = str(value).strip()
+    if text == "" or text.lower() == "nan":
+        return default
+    return text
+
+def fmt_num(value):
+    try:
+        return f"{float(value):.3f}"
+    except:
+        return "0.000"
+
+def make_star_rating(value):
+    try:
+        value = int(value)
+    except:
+        value = 3
+
+    value = max(1, min(5, value))
+    full = "⭐" * value
+    empty = "☆" * (5 - value)
+    return f"{full}{empty}"
+
+def get_main_element_text(row):
+    element_map = [
+        ("지속성", row.get("earth", 0)),
+        ("수속성", row.get("water", 0)),
+        ("화속성", row.get("fire", 0)),
+        ("풍속성", row.get("wind", 0)),
+    ]
+
+    valid_elements = []
+    for name, val in element_map:
+        try:
+            num = int(float(val))
+            if num > 0:
+                valid_elements.append((name, num))
+        except:
+            pass
+
+    if not valid_elements:
+        return "속성 없음"
+
+    main_element = max(valid_elements, key=lambda x: x[1])
+    return f"{main_element[0]} {main_element[1]}"
+
 def get_role_badge(role):
     role = str(role).strip()
     if role == "딜러":
@@ -157,8 +369,7 @@ def get_role_badge(role):
         return '<span class="badge badge-support">보조</span>'
     elif role == "힐러":
         return '<span class="badge badge-healer">힐러</span>'
-    else:
-        return f'<span class="badge badge-default">{role}</span>'
+    return f'<span class="badge badge-default">{role}</span>'
 
 def get_beginner_badge(beginner_text):
     text = str(beginner_text).strip()
@@ -192,14 +403,14 @@ def make_element_row(label, value, color):
     value = int(value)
     width_percent = value * 10
     return f"""
-    <div class="element-row">
-        <div class="element-label">{label}</div>
-        <div class="element-bar-wrap">
-            <div class="element-bar" style="width:{width_percent}%; background:{color};"></div>
-        </div>
-        <div class="element-value">{value}</div>
+<div class="element-row">
+    <div class="element-label">{label}</div>
+    <div class="element-bar-wrap">
+        <div class="element-bar" style="width:{width_percent}%; background:{color};"></div>
     </div>
-    """
+    <div class="element-value">{value}</div>
+</div>
+"""
 
 def get_element_graph(row):
     earth = int(row["earth"])
@@ -223,6 +434,59 @@ def get_element_graph(row):
 
     return html
 
+def make_stat_card(title, hp, attack, defense, agility, total):
+    return f"""
+<div class="stat-card">
+    <div class="stat-title">{title}</div>
+    <div class="stat-row"><span class="stat-label">체력</span><span class="stat-value">{fmt_num(hp)}</span></div>
+    <div class="stat-row"><span class="stat-label">공격</span><span class="stat-value">{fmt_num(attack)}</span></div>
+    <div class="stat-row"><span class="stat-label">방어</span><span class="stat-value">{fmt_num(defense)}</span></div>
+    <div class="stat-row"><span class="stat-label">순발</span><span class="stat-value">{fmt_num(agility)}</span></div>
+    <div class="stat-row total-row">
+        <span class="total-label">총성장</span>
+        <span class="total-value">{fmt_num(total)}</span>
+    </div>
+</div>
+"""
+
+def make_rainbow_card(required_total):
+    return f"""
+<div class="rainbow-card">
+    <div>
+        <div class="rainbow-title">무지개 등급 기준</div>
+        <div class="rainbow-desc">
+            환생 전 기준으로<br>
+            무지개 등급 가능 최소 총능력치
+        </div>
+    </div>
+    <div class="rainbow-value">{fmt_num(required_total)}</div>
+</div>
+"""
+
+def make_summary_card(raid_rating, main_element_text, pre_total, rainbow_total):
+    stars = make_star_rating(raid_rating)
+
+    html = '<div class="summary-card">'
+    html += '<div class="summary-title">핵심 요약</div>'
+
+    html += '<div class="summary-section">'
+    html += '<div class="summary-label">레이드 활용도</div>'
+    html += f'<div class="summary-value">{stars}</div>'
+    html += '</div>'
+
+    html += '<div class="summary-section">'
+    html += '<div class="summary-label">환생전 총성장</div>'
+    html += f'<div class="summary-value">{fmt_num(pre_total)}</div>'
+    html += '</div>'
+
+    html += '<div class="summary-section">'
+    html += '<div class="summary-label">무지개 기준</div>'
+    html += f'<div class="summary-value summary-highlight">{fmt_num(rainbow_total)}</div>'
+    html += '</div>'
+
+    html += '</div>'
+    return html
+
 def pet_card(pet_name):
     pet_info = pets_df[pets_df["pet_name"] == pet_name]
 
@@ -231,49 +495,104 @@ def pet_card(pet_name):
         return
 
     row = pet_info.iloc[0]
+    raid_rating = row["raid_rating"] if "raid_rating" in row.index else 3
+    main_element_text = get_main_element_text(row)
 
     with st.container(border=True):
-        col1, col2 = st.columns([1, 2])
+        col1, col2, col3 = st.columns([1, 2, 1])
 
         with col1:
-            show_pet_image(pet_name, width=240)
+            show_pet_image(pet_name, width=180)
 
         with col2:
-            st.markdown(f'<div class="pet-name">{row["pet_name"]}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="pet-name">{clean_text(row["pet_name"])}</div>',
+                unsafe_allow_html=True
+            )
 
             badge_html = get_role_badge(row["role"]) + get_beginner_badge(row["beginner_friendly"])
             st.markdown(badge_html, unsafe_allow_html=True)
 
-            st.markdown('<div class="small-title">속성</div>', unsafe_allow_html=True)
-            st.markdown(get_element_graph(row), unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="pet-sub-desc">{clean_text(row["notes"], "설명 없음")}</div>',
+                unsafe_allow_html=True
+            )
 
             st.markdown(
-                f'<div class="desc-box"><b>주요 스킬:</b> {row["main_skill"]}</div>',
+                f'<div class="info-line"><span class="info-label">주요 스킬:</span> {clean_text(row["main_skill"])}</div>',
                 unsafe_allow_html=True
             )
             st.markdown(
-                f'<div class="desc-box"><b>보조 스킬:</b> {row["sub_skill"]}</div>',
+                f'<div class="info-line"><span class="info-label">보조 스킬:</span> {clean_text(row["sub_skill"])}</div>',
                 unsafe_allow_html=True
             )
+
+        with col3:
             st.markdown(
-                f'<div class="desc-box"><b>설명:</b> {row["notes"]}</div>',
+                make_summary_card(
+                    raid_rating,
+                    main_element_text,
+                    row["pre_current_total"],
+                    row["rainbow_required_total"]
+                ),
                 unsafe_allow_html=True
             )
+
+        st.markdown('<div class="small-title">핵심 능력치</div>', unsafe_allow_html=True)
+        stat1, stat2, stat3 = st.columns(3)
+
+        with stat1:
+            st.markdown(
+                make_stat_card(
+                    "환생 전",
+                    row["pre_hp"],
+                    row["pre_attack"],
+                    row["pre_defense"],
+                    row["pre_agility"],
+                    row["pre_current_total"]
+                ),
+                unsafe_allow_html=True
+            )
+
+        with stat2:
+            st.markdown(
+                make_stat_card(
+                    "환생 후",
+                    row["post_hp"],
+                    row["post_attack"],
+                    row["post_defense"],
+                    row["post_agility"],
+                    row["post_total"]
+                ),
+                unsafe_allow_html=True
+            )
+
+        with stat3:
+            st.markdown(
+                make_rainbow_card(row["rainbow_required_total"]),
+                unsafe_allow_html=True
+            )
+
+        st.markdown('<div class="small-title">속성</div>', unsafe_allow_html=True)
+        st.markdown(get_element_graph(row), unsafe_allow_html=True)
 
 def raid_pet_card(raid_row):
     pet_name = raid_row["recommended_pet"]
     pet_info = pets_df[pets_df["pet_name"] == pet_name]
 
     with st.container(border=True):
-        st.markdown('<div style="padding:8px 4px;">', unsafe_allow_html=True)
+        st.markdown('<div class="usage-card">', unsafe_allow_html=True)
 
         col_img, col_info = st.columns([1, 2])
 
         with col_img:
-            show_pet_image(pet_name, width=180)
+            show_pet_image(pet_name, width=160)
 
         with col_info:
-            st.markdown(f'<div class="pet-name">{pet_name}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div class="pet-name" style="font-size:28px;">{clean_text(pet_name)}</div>',
+                unsafe_allow_html=True
+            )
 
             badge_html = get_recommend_badge(raid_row["recommend_level"])
 
@@ -283,21 +602,26 @@ def raid_pet_card(raid_row):
                 badge_html += get_beginner_badge(pet_row["beginner_friendly"])
                 st.markdown(badge_html, unsafe_allow_html=True)
 
-                st.markdown('<div class="small-title">속성</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="pet-sub-desc" style="margin-bottom:10px;">{clean_text(pet_row["notes"], "설명 없음")}</div>',
+                    unsafe_allow_html=True
+                )
+
+                st.markdown('<div class="small-title" style="font-size:16px;">속성</div>', unsafe_allow_html=True)
                 st.markdown(get_element_graph(pet_row), unsafe_allow_html=True)
             else:
                 st.markdown(badge_html, unsafe_allow_html=True)
 
             st.markdown(
-                f'<div class="desc-box"><b>역할:</b> {raid_row["role_needed"]}</div>',
+                f'<div class="info-line"><span class="info-label">역할:</span> {clean_text(raid_row["role_needed"])}</div>',
                 unsafe_allow_html=True
             )
             st.markdown(
-                f'<div class="desc-box"><b>필요 스킬:</b> {raid_row["required_skill"]}</div>',
+                f'<div class="info-line"><span class="info-label">필요 스킬:</span> {clean_text(raid_row["required_skill"])}</div>',
                 unsafe_allow_html=True
             )
             st.markdown(
-                f'<div class="desc-box"><b>초보 팁:</b> {raid_row["beginner_tip"]}</div>',
+                f'<div class="info-line"><span class="info-label">초보 팁:</span> {clean_text(raid_row["beginner_tip"])}</div>',
                 unsafe_allow_html=True
             )
 
@@ -315,10 +639,19 @@ def show_raid_info(selected_raid):
     with st.container(border=True):
         st.markdown("## 레이드 설명")
         st.markdown(get_difficulty_badge(row["difficulty"]), unsafe_allow_html=True)
-        st.markdown(f'<div class="raid-info-box"><b>요약:</b> {row["summary"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="raid-info-box"><b>핵심 팁:</b> {row["core_tip"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="raid-info-box"><b>추천 파티:</b> {row["party_tip"]}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="raid-info-box"><b>주의할 점:</b> {row["caution"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>요약:</b> {clean_text(row["summary"])}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>핵심 팁:</b> {clean_text(row["core_tip"])}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>추천 파티:</b> {clean_text(row["party_tip"])}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="raid-info-box"><b>주의할 점:</b> {clean_text(row["caution"])}</div>', unsafe_allow_html=True)
+
+        youtube_url = ""
+        if "youtube_url" in raid_info_df.columns:
+            youtube_url = row["youtube_url"]
+
+        if pd.notna(youtube_url) and str(youtube_url).strip() != "":
+            st.link_button("🎬 해당 레이드 공략 영상 보기", youtube_url)
+        else:
+            st.info("등록된 공략 영상이 없습니다.")
 
 def show_ride_pet_info(selected_raid):
     ride_info = ride_pet_df[ride_pet_df["raid_name"] == selected_raid].reset_index(drop=True)
@@ -336,17 +669,17 @@ def show_ride_pet_info(selected_raid):
         with cols[0]:
             with st.container(border=True):
                 row = ride_info.iloc[i]
-                st.markdown(f"### {row['character_role']}")
-                st.write(f"**추천 탑승펫:** {row['ride_pet']}")
-                st.write(f"**추천 이유:** {row['ride_reason']}")
+                st.markdown(f"### {clean_text(row['character_role'])}")
+                st.write(f"**추천 탑승펫:** {clean_text(row['ride_pet'])}")
+                st.write(f"**추천 이유:** {clean_text(row['ride_reason'])}")
 
         if i + 1 < len(ride_info):
             with cols[1]:
                 with st.container(border=True):
                     row = ride_info.iloc[i + 1]
-                    st.markdown(f"### {row['character_role']}")
-                    st.write(f"**추천 탑승펫:** {row['ride_pet']}")
-                    st.write(f"**추천 이유:** {row['ride_reason']}")
+                    st.markdown(f"### {clean_text(row['character_role'])}")
+                    st.write(f"**추천 탑승펫:** {clean_text(row['ride_pet'])}")
+                    st.write(f"**추천 이유:** {clean_text(row['ride_reason'])}")
 
 # ---------- 상단 ----------
 st.title("스톤에이지 초보용 펫 도감")
@@ -423,11 +756,11 @@ elif menu == "펫 도감":
         else:
             for _, row in related_raids.iterrows():
                 with st.container(border=True):
-                    st.markdown(f"### {row['raid_name']}")
-                    st.markdown(f"**추천도:** {row['recommend_level']}")
-                    st.markdown(f"**역할:** {row['role_needed']}")
-                    st.markdown(f"**필요 스킬:** {row['required_skill']}")
-                    st.markdown(f"**초보 팁:** {row['beginner_tip']}")
+                    st.markdown(f"### {clean_text(row['raid_name'])}")
+                    st.markdown(f"**추천도:** {clean_text(row['recommend_level'])}")
+                    st.markdown(f"**역할:** {clean_text(row['role_needed'])}")
+                    st.markdown(f"**필요 스킬:** {clean_text(row['required_skill'])}")
+                    st.markdown(f"**초보 팁:** {clean_text(row['beginner_tip'])}")
 
 # ---------- 하단 ----------
 st.markdown("---")
