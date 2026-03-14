@@ -96,7 +96,7 @@ JACKPOT_GAIN = 1.900
 st.markdown("""
 <style>
 .block-container {
-    padding-top: 2rem;
+    padding-top: 1.6rem;
     padding-bottom: 2rem;
     max-width: 1200px;
 }
@@ -132,6 +132,7 @@ st.markdown("""
     margin-bottom: 10px;
     color: #1f2d3d;
     line-height: 1.2;
+    word-break: keep-all;
 }
 
 .pet-sub-desc {
@@ -243,7 +244,7 @@ st.markdown("""
     color: #111827;
 }
 
-.stat-row {
+.stat-row-basic {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -253,7 +254,7 @@ st.markdown("""
     gap: 10px;
 }
 
-.stat-row:last-child {
+.stat-row-basic:last-child {
     border-bottom: none;
 }
 
@@ -532,6 +533,7 @@ st.markdown("""
 
 .top-pet-info {
     flex: 1;
+    min-width: 0;
 }
 
 .top-pet-title {
@@ -540,6 +542,7 @@ st.markdown("""
     color: #1f2d3d;
     line-height: 1.2;
     margin-bottom: 14px;
+    word-break: keep-all;
 }
 
 .top-pet-desc {
@@ -565,6 +568,74 @@ st.markdown("""
     color: #4b5563;
     line-height: 1.9;
     word-break: keep-all;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1.2rem;
+    }
+
+    .pet-name {
+        font-size: 26px;
+    }
+
+    .pet-sub-desc,
+    .info-line,
+    .skill-value,
+    .top-pet-desc,
+    .top-sim-desc {
+        font-size: 14px;
+    }
+
+    .summary-card,
+    .stat-card,
+    .rainbow-card,
+    .skill-card {
+        min-height: auto;
+        height: auto;
+    }
+
+    .top-html-card,
+    .top-html-sim {
+        min-height: auto;
+        padding: 14px;
+    }
+
+    .top-pet-wrap {
+        gap: 12px;
+    }
+
+    .top-pet-img,
+    .top-pet-placeholder {
+        width: 96px;
+        min-width: 96px;
+        height: 96px;
+    }
+
+    .top-pet-title {
+        font-size: 22px;
+        margin-bottom: 8px;
+    }
+
+    .badge {
+        font-size: 12px;
+        padding: 5px 10px;
+    }
+
+    .grade-general,
+    .grade-rare,
+    .grade-epic,
+    .grade-near-rainbow,
+    .grade-rainbow {
+        font-size: 18px;
+        padding: 14px 12px;
+    }
+
+    .rainbow-value {
+        font-size: 24px;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -728,11 +799,11 @@ def make_stat_card(title, hp, attack, defense, agility, total):
     return f"""
 <div class="stat-card">
     <div class="stat-title">{title}</div>
-    <div class="stat-row"><span class="stat-label">체력</span><span class="stat-value">{fmt_num(hp)}</span></div>
-    <div class="stat-row"><span class="stat-label">공격</span><span class="stat-value">{fmt_num(attack)}</span></div>
-    <div class="stat-row"><span class="stat-label">방어</span><span class="stat-value">{fmt_num(defense)}</span></div>
-    <div class="stat-row"><span class="stat-label">순발</span><span class="stat-value">{fmt_num(agility)}</span></div>
-    <div class="stat-row total-row">
+    <div class="stat-row-basic"><span class="stat-label">체력</span><span class="stat-value">{fmt_num(hp)}</span></div>
+    <div class="stat-row-basic"><span class="stat-label">공격</span><span class="stat-value">{fmt_num(attack)}</span></div>
+    <div class="stat-row-basic"><span class="stat-label">방어</span><span class="stat-value">{fmt_num(defense)}</span></div>
+    <div class="stat-row-basic"><span class="stat-label">순발</span><span class="stat-value">{fmt_num(agility)}</span></div>
+    <div class="stat-row-basic total-row">
         <span class="total-label">총성장</span>
         <span class="total-value">{fmt_num(total)}</span>
     </div>
@@ -864,61 +935,6 @@ def get_grade(total_g, rare, epic, perfect, near_rainbow):
     return "일반"
 
 
-def show_grade_effect(grade):
-    if grade == "무지개":
-        st.markdown(
-            """
-            <div class="grade-rainbow">
-            🌈 무지개 등장!!<br>
-            🎉 무지개 추카합니다! 🎉
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-        st.balloons()
-
-    elif grade == "무지개 근접":
-        st.markdown(
-            """
-            <div class="grade-near-rainbow">
-            ✨ 무지개 근접!<br>
-            정말 아쉽지만 엄청 잘 나왔습니다!
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    elif grade == "극품":
-        st.markdown(
-            """
-            <div class="grade-epic">
-            🔥 극품 환생 등장!
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    elif grade == "희귀":
-        st.markdown(
-            """
-            <div class="grade-rare">
-            ✨ 희귀 환생 성공!
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    else:
-        st.markdown(
-            """
-            <div class="grade-general">
-            🙂 평범한 환생입니다
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-
 def get_sim_default_stats(row):
     pre_max_total = float(row.get("pre_max_total", 0))
     pre_hp = float(row.get("pre_hp", 0))
@@ -969,7 +985,7 @@ def render_sim_top_info_card():
         <div class="top-sim-wrap">
             <div class="top-sim-title">환생 시뮬레이터</div>
             <div class="top-sim-desc">
-                1회 / 10회 <br>
+                1회 / 10회<br>
                 원하는 방식으로 환생 결과를 확인할 수 있습니다.
             </div>
         </div>
@@ -1087,16 +1103,19 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
     <html>
     <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <style>
         * {{
             box-sizing: border-box;
         }}
-        body {{
+        html, body {{
             margin: 0;
             padding: 0;
             background: transparent;
             font-family: Pretendard, "Noto Sans KR", Arial, sans-serif;
             color: #ffffff;
+            width: 100%;
+            overflow-x: hidden;
         }}
         .rebirth-wrap {{
             width: 100%;
@@ -1206,6 +1225,8 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             opacity: 0;
             transform: translateY(12px) scale(0.95);
             transition: all 0.5s ease;
+            max-width: 100%;
+            word-break: keep-all;
         }}
         .rebirth-grade.show {{
             opacity: 1;
@@ -1220,6 +1241,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             font-weight: 900;
             line-height: 1.2;
             margin-bottom: 8px;
+            word-break: keep-all;
         }}
         .rebirth-sub {{
             font-size: 16px;
@@ -1246,6 +1268,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             font-size: 21px;
             font-weight: 900;
             color: #fff6e6;
+            word-break: keep-all;
         }}
         .stat-row:not(.total) .stat-label {{
             font-size: 18px;
@@ -1257,6 +1280,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             background: rgba(255,255,255,0.10);
             border-radius: 999px;
             overflow: hidden;
+            min-width: 0;
         }}
         .stat-row.total .bar-track {{
             height: 22px;
@@ -1278,6 +1302,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             font-size: 20px;
             font-weight: 900;
             color: #ffffff;
+            white-space: nowrap;
         }}
         .stat-row:not(.total) .stat-value {{
             font-size: 18px;
@@ -1289,6 +1314,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             color: #7df071;
             opacity: 0;
             transition: opacity 0.35s ease;
+            white-space: nowrap;
         }}
         .stat-gain.show {{
             opacity: 1;
@@ -1304,6 +1330,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             font-weight: 800;
             opacity: 0;
             transition: opacity 0.35s ease;
+            padding: 0 8px;
         }}
         .tension-text.show {{
             opacity: 1;
@@ -1331,6 +1358,134 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
             opacity: 1;
             transform: translateY(0);
         }}
+
+        @media (max-width: 900px) {{
+            .rebirth-title {{
+                font-size: 34px;
+            }}
+            .rebirth-content {{
+                gap: 18px;
+                padding: 14px 18px 10px 18px;
+            }}
+            .rebirth-left {{
+                min-width: 180px;
+            }}
+            .rebirth-pet-img,
+            .rebirth-pet-placeholder {{
+                width: 170px;
+                height: 170px;
+            }}
+            .rebirth-pet-stage {{
+                min-height: 200px;
+            }}
+            .rebirth-name {{
+                font-size: 28px;
+            }}
+            .stat-row {{
+                grid-template-columns: 92px 1fr 72px 74px;
+                gap: 10px;
+            }}
+            .stat-label {{
+                font-size: 18px;
+            }}
+            .stat-row:not(.total) .stat-label {{
+                font-size: 16px;
+            }}
+            .stat-value,
+            .stat-gain {{
+                font-size: 16px;
+            }}
+            .stat-row:not(.total) .stat-value,
+            .stat-row:not(.total) .stat-gain {{
+                font-size: 15px;
+            }}
+        }}
+
+        @media (max-width: 640px) {{
+            .rebirth-card {{
+                min-height: auto;
+                border-radius: 18px;
+                padding-bottom: 12px;
+            }}
+            .rebirth-title {{
+                font-size: 26px;
+                padding-top: 16px;
+            }}
+            .rebirth-content {{
+                display: block;
+                padding: 10px 12px 8px 12px;
+            }}
+            .rebirth-left {{
+                width: 100%;
+                min-width: 0;
+                margin-bottom: 12px;
+            }}
+            .rebirth-pet-stage {{
+                min-height: 150px;
+            }}
+            .rebirth-pet-stage:before {{
+                width: 120px;
+                height: 120px;
+            }}
+            .rebirth-pet-img,
+            .rebirth-pet-placeholder {{
+                width: 120px;
+                height: 120px;
+            }}
+            .rebirth-grade {{
+                font-size: 16px;
+                padding: 8px 16px;
+            }}
+            .rebirth-name {{
+                font-size: 22px;
+                text-align: center;
+            }}
+            .rebirth-sub {{
+                font-size: 13px;
+                text-align: center;
+                margin-bottom: 10px;
+            }}
+            .rebirth-line {{
+                margin-bottom: 10px;
+            }}
+            .stat-row {{
+                grid-template-columns: 78px 1fr 58px 62px;
+                gap: 8px;
+                margin: 10px 0;
+            }}
+            .stat-label {{
+                font-size: 15px;
+            }}
+            .stat-row:not(.total) .stat-label {{
+                font-size: 14px;
+            }}
+            .bar-track {{
+                height: 14px;
+            }}
+            .stat-row.total .bar-track {{
+                height: 18px;
+            }}
+            .stat-value,
+            .stat-gain {{
+                font-size: 12px;
+            }}
+            .stat-row:not(.total) .stat-value,
+            .stat-row:not(.total) .stat-gain {{
+                font-size: 12px;
+            }}
+            .tension-text {{
+                font-size: 12px;
+            }}
+            .bottom-note {{
+                margin: 8px 12px 0 12px;
+                font-size: 12px;
+                display: block;
+            }}
+            .bottom-note > div {{
+                margin-bottom: 6px;
+                text-align: center;
+            }}
+        }}
     </style>
     </head>
     <body>
@@ -1356,7 +1511,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                         <div class="stat-row total">
                             <div class="stat-label">총성장</div>
                             <div class="bar-track">
-                                <div id="{uid}_total" class="bar-fill total" style="width:{total_start_pct:.1f}%; height:22px;"></div>
+                                <div id="{uid}_total" class="bar-fill total" style="width:{total_start_pct:.1f}%; height:100%;"></div>
                             </div>
                             <div id="{uid}_value_total" class="stat-value">0.000</div>
                             <div id="{uid}_gain_total" class="stat-gain">+0.000</div>
@@ -1365,7 +1520,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                         <div class="stat-row">
                             <div class="stat-label">체력성장</div>
                             <div class="bar-track">
-                                <div id="{uid}_hp" class="bar-fill" style="width:{hp_start_pct:.1f}%; height:18px;"></div>
+                                <div id="{uid}_hp" class="bar-fill" style="width:{hp_start_pct:.1f}%; height:100%;"></div>
                             </div>
                             <div id="{uid}_value_hp" class="stat-value">0.000</div>
                             <div id="{uid}_gain_hp" class="stat-gain">+0.000</div>
@@ -1374,7 +1529,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                         <div class="stat-row">
                             <div class="stat-label">공격성장</div>
                             <div class="bar-track">
-                                <div id="{uid}_atk" class="bar-fill" style="width:{atk_start_pct:.1f}%; height:18px;"></div>
+                                <div id="{uid}_atk" class="bar-fill" style="width:{atk_start_pct:.1f}%; height:100%;"></div>
                             </div>
                             <div id="{uid}_value_atk" class="stat-value">0.000</div>
                             <div id="{uid}_gain_atk" class="stat-gain">+0.000</div>
@@ -1383,7 +1538,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                         <div class="stat-row">
                             <div class="stat-label">방어성장</div>
                             <div class="bar-track">
-                                <div id="{uid}_def" class="bar-fill" style="width:{def_start_pct:.1f}%; height:18px;"></div>
+                                <div id="{uid}_def" class="bar-fill" style="width:{def_start_pct:.1f}%; height:100%;"></div>
                             </div>
                             <div id="{uid}_value_def" class="stat-value">0.000</div>
                             <div id="{uid}_gain_def" class="stat-gain">+0.000</div>
@@ -1392,7 +1547,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                         <div class="stat-row">
                             <div class="stat-label">순발성장</div>
                             <div class="bar-track">
-                                <div id="{uid}_spd" class="bar-fill" style="width:{spd_start_pct:.1f}%; height:18px;"></div>
+                                <div id="{uid}_spd" class="bar-fill" style="width:{spd_start_pct:.1f}%; height:100%;"></div>
                             </div>
                             <div id="{uid}_value_spd" class="stat-value">0.000</div>
                             <div id="{uid}_gain_spd" class="stat-gain">+0.000</div>
@@ -1488,7 +1643,8 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
     </html>
     """
 
-    components.html(html, height=600, scrolling=False)
+    # 모바일에서 iframe 내부가 잘리거나 안 보이는 문제 방지용으로 높이 상향
+    components.html(html, height=760, scrolling=False)
 
 
 def pet_card(pet_name):
@@ -1836,35 +1992,7 @@ def show_reincarnation_simulator():
                     unsafe_allow_html=True
                 )
 
-            detail1, detail2 = st.columns(2)
-
-            with detail1:
-                st.markdown(
-                    f"""
-                    <div class="result-box">
-                        <div class="result-title">환생 후 성장치 상세</div>
-                        체력 <b>{one['hp_g']:.3f}</b> /
-                        공격 <b>{one['atk_g']:.3f}</b> /
-                        방어 <b>{one['def_g']:.3f}</b> /
-                        순발 <b>{one['spd_g']:.3f}</b>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-            with detail2:
-                st.markdown(
-                    f"""
-                    <div class="result-box">
-                        <div class="result-title">환생 전 대비 상승폭</div>
-                        체력 <b>{one['hp_g'] - hp_g:+.3f}</b> /
-                        공격 <b>{one['atk_g'] - atk_g:+.3f}</b> /
-                        방어 <b>{one['def_g'] - def_g:+.3f}</b> /
-                        순발 <b>{one['spd_g'] - spd_g:+.3f}</b>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+           
 
         else:
             if grade_counts["무지개"] > 0:
@@ -1956,7 +2084,7 @@ def show_reincarnation_simulator():
 
 # ---------- 상단 ----------
 st.title("스톤에이지 각성 초보용 펫 도감")
-st.caption("레이드별 추천 펫 + 환생 시뮬레이터 통합 Version 2.4.1")
+st.caption("레이드별 추천 펫 + 환생 시뮬레이터 통합 Version 2.5 Mobile")
 
 st.markdown("""
 <div style="padding: 10px 0 20px 0;">
