@@ -1871,7 +1871,7 @@ def show_ride_pet_info(selected_raid):
 
 def show_reincarnation_simulator():
     st.header("환생 시뮬레이터")
-    st.caption("펫의 현재 성장치를 바탕으로 환생 결과를 미리 확인해보세요.")
+    st.caption("※ 환생 시뮬레이터는 실제 게임 데이터를 참고한 체감형 기능이며, 참고용으로 활용해주세요.")
 
     pet_list = sorted(pets_df["pet_name"].dropna().unique().tolist())
     default_pet = "백호" if "백호" in pet_list else pet_list[0]
