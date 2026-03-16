@@ -88,7 +88,7 @@ pets_df, raids_df, raid_info_df, ride_pet_df = load_data()
 # ---------- 환생 시뮬레이터 설정 ----------
 REINCARNATION_MIN_RATIO = 1.15
 REINCARNATION_MAX_RATIO = 1.40
-DEFAULT_SIM_INPUT_RATIO = 0.981
+DEFAULT_SIM_INPUT_RATIO = 1.000
 JACKPOT_GAIN = 1.900
 
 
@@ -1933,7 +1933,7 @@ def show_reincarnation_simulator():
     opt1, opt2 = st.columns([1, 1])
 
     with opt1:
-        sim_count = st.selectbox("시뮬레이션 횟수", [1, 10], index=0)
+        sim_count = st.selectbox("시뮬레이션 횟수", [1, 10,100], index=0)
 
     with opt2:
         st.markdown("<br>", unsafe_allow_html=True)
