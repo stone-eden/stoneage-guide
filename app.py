@@ -1162,7 +1162,7 @@ def estimate_grade_thresholds(current_total, pet_row=None):
 
     rare = round(estimated_post_max_total * 0.84, 3)
     epic = round(estimated_post_max_total * 0.955, 3)
-    perfect = round(estimated_post_max_total * 0.9955, 3)
+    perfect = round(estimated_post_max_total * 0.9975, 3)
     near_rainbow = round(perfect * 0.994, 3)
 
     return rare, epic, perfect, near_rainbow, estimated_post_max_total
