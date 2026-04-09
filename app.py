@@ -78,7 +78,8 @@ def load_data():
         pets["pre_agility"]
     ).round(3)
 
-    pets["rainbow_required_total"] = (pets["pre_max_total"] * 0.981).round(3)
+    # 무지개 기준: 환생후 최대 성장치 x 0.9794
+    pets["rainbow_required_total"] = (pets["post_total"] * 0.9794).round(3)
 
     return pets, raids, raid_info, ride_pet
 
@@ -90,9 +91,32 @@ pets_df, raids_df, raid_info_df, ride_pet_df = load_data()
 DEFAULT_SIM_INPUT_RATIO = 1.000
 JACKPOT_GAIN = 1.900
 
-# 세부 환생 퍼센트 범위
 REINCARNATION_MIN_PCT = 85.0
 REINCARNATION_MAX_PCT = 105.0
+
+# 공통배율 가중치 테이블
+UNIFORM_RATE_WEIGHTS = {
+    1.20: 3,
+    1.21: 0,
+    1.22: 0,
+    1.23: 2,
+    1.24: 1,
+    1.25: 1,
+    1.26: 1,
+    1.27: 2,
+    1.28: 3,
+    1.29: 3,
+    1.30: 2,
+    1.31: 1,
+    1.32: 2,
+    1.33: 4,
+    1.34: 15,
+    1.35: 11,
+    1.36: 4,
+    1.37: 7,
+    1.38: 3,
+    1.39: 2,
+}
 
 
 # ---------- 스타일 ----------
@@ -727,6 +751,12 @@ def clamp(value, low, high):
     return max(low, min(high, value))
 
 
+def clamp_growth(value, max_value):
+    if float(max_value) <= 0:
+        return floor_3(value)
+    return floor_3(min(float(value), float(max_value)))
+
+
 def make_star_rating(value):
     try:
         value = int(value)
@@ -827,8 +857,8 @@ def get_element_graph(row):
     return html
 
 
-def get_small_over_badge_html(pct):
-    if float(pct) > 100:
+def get_small_over_badge_html(is_over):
+    if bool(is_over):
         return '<span class="stat-over-badge">爆</span>'
     return ""
 
@@ -855,7 +885,7 @@ def make_rainbow_card(required_total):
     <div>
         <div class="rainbow-title">무지개 등급 기준</div>
         <div class="rainbow-desc">
-            환생 전 기준으로<br>
+            환생 후 기준으로<br>
             무지개 등급 가능 최소 총능력치
         </div>
     </div>
@@ -924,100 +954,18 @@ def calc_stat_pct(current_value, max_value):
 
 
 # ---------- 환생 알고리즘 ----------
-def weighted_random_between(low, high, center, spread=0.35):
+def weighted_choice_from_dict(weight_dict):
+    items = list(weight_dict.keys())
+    weights = list(weight_dict.values())
+    return random.choices(items, weights=weights, k=1)[0]
+
+
+def roll_uniform_multiplier():
     """
-    center 쪽으로 살짝 몰리는 랜덤
-    spread가 작을수록 center 근처에 더 몰림
+    공통배율 1개를 확률 테이블에서 선택
+    예: 1.34 -> 현재 성장치의 134%
     """
-    center = clamp(center, low, high)
-    r = random.random()
-
-    if r < 0.5:
-        return low + (center - low) * (random.random() ** spread)
-    else:
-        return center + (high - center) * (1 - (random.random() ** spread))
-
-
-def rebalance_total_pct_cap(pcts, total_cap=400.0):
-    """
-    세부 4개 퍼센트 합이 total_cap을 넘지 않도록 보정
-    우선 100 초과분부터 줄이고,
-    그래도 넘으면 남은 구간에서 비례 감소
-    """
-    total = sum(pcts.values())
-    if total <= total_cap:
-        return pcts
-
-    excess = total - total_cap
-
-    over_keys = [k for k, v in pcts.items() if v > 100.0]
-    over_room = sum(pcts[k] - 100.0 for k in over_keys)
-
-    if over_room > 0:
-        reduce_amount = min(excess, over_room)
-        for k in over_keys:
-            share = (pcts[k] - 100.0) / over_room if over_room > 0 else 0
-            pcts[k] -= reduce_amount * share
-        excess = sum(pcts.values()) - total_cap
-
-    if excess > 0:
-        room_keys = [k for k, v in pcts.items() if v > REINCARNATION_MIN_PCT]
-        room_sum = sum(pcts[k] - REINCARNATION_MIN_PCT for k in room_keys)
-        if room_sum > 0:
-            for k in room_keys:
-                share = (pcts[k] - REINCARNATION_MIN_PCT) / room_sum if room_sum > 0 else 0
-                pcts[k] -= excess * share
-
-    for k in pcts:
-        pcts[k] = clamp(pcts[k], REINCARNATION_MIN_PCT, REINCARNATION_MAX_PCT)
-
-    return pcts
-
-
-def roll_child_pct_from_parent(parent_pct):
-    """
-    평균을 살짝 더 보수적으로 조정한 버전
-    - 부모 100 미만: 전체적으로 낮은 구간 중심
-    - 부모 100 이상: 爆 확률 낮춤, 일반 결과도 과하게 높지 않음
-    """
-    parent_pct = clamp(parent_pct, REINCARNATION_MIN_PCT, REINCARNATION_MAX_PCT)
-
-    if parent_pct < 100.0:
-        base_center = 89.8 + (parent_pct - 85.0) * 0.48
-        child_pct = weighted_random_between(
-            REINCARNATION_MIN_PCT,
-            99.4,
-            center=base_center,
-            spread=0.78
-        )
-        child_pct += random.uniform(-1.2, 0.6)
-        return clamp(child_pct, REINCARNATION_MIN_PCT, 99.7)
-
-    over_amount = parent_pct - 100.0
-
-    # 爆 확률 살짝 더 보수적
-    over_chance = min(0.004 + over_amount * 0.018, 0.09)
-
-    if random.random() < over_chance:
-        over_center = 100.05 + over_amount * 0.18
-        child_pct = weighted_random_between(
-            100.0,
-            REINCARNATION_MAX_PCT,
-            center=over_center,
-            spread=0.98
-        )
-        child_pct += random.uniform(-0.2, 0.2)
-        return clamp(child_pct, 100.0, REINCARNATION_MAX_PCT)
-
-    normal_center = 93.0 + over_amount * 0.12
-    child_pct = weighted_random_between(
-        REINCARNATION_MIN_PCT,
-        99.6,
-        center=normal_center,
-        spread=0.80
-    )
-    child_pct += random.uniform(-1.0, 0.6)
-    return clamp(child_pct, REINCARNATION_MIN_PCT, 99.8)
+    return float(weighted_choice_from_dict(UNIFORM_RATE_WEIGHTS))
 
 
 def cap_total_growth(hp, atk, deff, spd, total_cap):
@@ -1075,59 +1023,49 @@ def simulate_one_reincarnation(hp_g, atk_g, def_g, spd_g, pet_row=None):
             "atk_pct": 100.0,
             "def_pct": 100.0,
             "spd_pct": 100.0,
+            "hp_over": False,
+            "atk_over": False,
+            "def_over": False,
+            "spd_over": False,
+            "uniform_rate": 1.00,
         }
-
-    pre_hp_max = float(pet_row.get("pre_hp", 0))
-    pre_atk_max = float(pet_row.get("pre_attack", 0))
-    pre_def_max = float(pet_row.get("pre_defense", 0))
-    pre_spd_max = float(pet_row.get("pre_agility", 0))
 
     post_hp_max = float(pet_row.get("post_hp", 0))
     post_atk_max = float(pet_row.get("post_attack", 0))
     post_def_max = float(pet_row.get("post_defense", 0))
     post_spd_max = float(pet_row.get("post_agility", 0))
-
-    parent_pcts = {
-        "hp": calc_stat_pct(hp_g, pre_hp_max),
-        "atk": calc_stat_pct(atk_g, pre_atk_max),
-        "def": calc_stat_pct(def_g, pre_def_max),
-        "spd": calc_stat_pct(spd_g, pre_spd_max),
-    }
-
-    child_pcts = {
-        "hp": roll_child_pct_from_parent(parent_pcts["hp"]),
-        "atk": roll_child_pct_from_parent(parent_pcts["atk"]),
-        "def": roll_child_pct_from_parent(parent_pcts["def"]),
-        "spd": roll_child_pct_from_parent(parent_pcts["spd"]),
-    }
-
-    # 세부 퍼센트 합 400 초과 금지
-    child_pcts = rebalance_total_pct_cap(child_pcts, total_cap=400.0)
-
-    for k in child_pcts:
-        child_pcts[k] = floor_1(child_pcts[k])
-
-    child_pcts = rebalance_total_pct_cap(child_pcts, total_cap=400.0)
-    for k in child_pcts:
-        child_pcts[k] = floor_1(child_pcts[k])
-
-    # 표시용 퍼센트는 유지
-    display_hp_pct = child_pcts["hp"]
-    display_atk_pct = child_pcts["atk"]
-    display_def_pct = child_pcts["def"]
-    display_spd_pct = child_pcts["spd"]
-
-    # 세부 능력치는 환생 후 최대치를 기준으로 계산
-    new_hp_g = floor_3(post_hp_max * (display_hp_pct / 100.0))
-    new_atk_g = floor_3(post_atk_max * (display_atk_pct / 100.0))
-    new_def_g = floor_3(post_def_max * (display_def_pct / 100.0))
-    new_spd_g = floor_3(post_spd_max * (display_spd_pct / 100.0))
-
-    # 총합은 환생 후 최대 총성장(post_total)을 넘지 않도록 보정
     post_total_max = float(pet_row.get("post_total", 0))
+
+    uniform_rate = roll_uniform_multiplier()
+
+    # clamp 전 원본값
+    raw_hp_g = floor_3(float(hp_g) * uniform_rate)
+    raw_atk_g = floor_3(float(atk_g) * uniform_rate)
+    raw_def_g = floor_3(float(def_g) * uniform_rate)
+    raw_spd_g = floor_3(float(spd_g) * uniform_rate)
+
+    # 爆 판정: 환생후 최대치 100% 초과 여부
+    hp_over = raw_hp_g > post_hp_max if post_hp_max > 0 else False
+    atk_over = raw_atk_g > post_atk_max if post_atk_max > 0 else False
+    def_over = raw_def_g > post_def_max if post_def_max > 0 else False
+    spd_over = raw_spd_g > post_spd_max if post_spd_max > 0 else False
+
+    # 실제 결과는 최대치로 제한
+    new_hp_g = clamp_growth(raw_hp_g, post_hp_max)
+    new_atk_g = clamp_growth(raw_atk_g, post_atk_max)
+    new_def_g = clamp_growth(raw_def_g, post_def_max)
+    new_spd_g = clamp_growth(raw_spd_g, post_spd_max)
+
+    # 총합 최대치 초과 방지
     new_hp_g, new_atk_g, new_def_g, new_spd_g, total_g = cap_total_growth(
         new_hp_g, new_atk_g, new_def_g, new_spd_g, post_total_max
     )
+
+    # 표시용 퍼센트는 최종 결과 / 환생후 최대치
+    display_hp_pct = floor_1((new_hp_g / post_hp_max) * 100.0) if post_hp_max > 0 else 0.0
+    display_atk_pct = floor_1((new_atk_g / post_atk_max) * 100.0) if post_atk_max > 0 else 0.0
+    display_def_pct = floor_1((new_def_g / post_def_max) * 100.0) if post_def_max > 0 else 0.0
+    display_spd_pct = floor_1((new_spd_g / post_spd_max) * 100.0) if post_spd_max > 0 else 0.0
 
     return {
         "hp_g": new_hp_g,
@@ -1139,6 +1077,11 @@ def simulate_one_reincarnation(hp_g, atk_g, def_g, spd_g, pet_row=None):
         "atk_pct": display_atk_pct,
         "def_pct": display_def_pct,
         "spd_pct": display_spd_pct,
+        "hp_over": hp_over,
+        "atk_over": atk_over,
+        "def_over": def_over,
+        "spd_over": spd_over,
+        "uniform_rate": uniform_rate,
     }
 
 
@@ -1161,8 +1104,8 @@ def estimate_grade_thresholds(current_total, pet_row=None):
     estimated_post_max_total = estimate_post_max_total(current_total, pet_row)
 
     rare = round(estimated_post_max_total * 0.84, 3)
-    epic = round(estimated_post_max_total * 0.955, 3)
-    perfect = round(estimated_post_max_total * 0.9975, 3)
+    epic = round(estimated_post_max_total * 0.9394, 3)      # 극품
+    perfect = round(estimated_post_max_total * 0.9794, 3)   # 무지개
     near_rainbow = round(perfect * 0.994, 3)
 
     return rare, epic, perfect, near_rainbow, estimated_post_max_total
@@ -1231,8 +1174,8 @@ def render_sim_top_info_card():
         <div class="top-sim-wrap">
             <div class="top-sim-title">환생 시뮬레이터</div>
             <div class="top-sim-desc">
-                부모 세부 성장치 비율을 반영해<br>
-                환생 후 세부 결과를 계산합니다.
+                공통배율 1개를 가중치 테이블에서 뽑아<br>
+                4개 세부능력치에 동일 적용합니다.
             </div>
         </div>
     </div>
@@ -1307,6 +1250,11 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
     atk_pct = float(result_stats.get("atk_pct", 100))
     def_pct = float(result_stats.get("def_pct", 100))
     spd_pct = float(result_stats.get("spd_pct", 100))
+
+    hp_over = bool(result_stats.get("hp_over", False))
+    atk_over = bool(result_stats.get("atk_over", False))
+    def_over = bool(result_stats.get("def_over", False))
+    spd_over = bool(result_stats.get("spd_over", False))
 
     if pet_row is not None:
         total_bar_max = max(
@@ -1802,7 +1750,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                             </div>
                             <div class="bar-track">
                                 <div id="{uid}_hp" class="bar-fill" style="width:{hp_start_pct:.1f}%; height:100%;"></div>
-                                {"<div id='" + uid + "_badge_hp' class='bar-badge' style='left:" + f"{hp_end_pct:.1f}" + "%;'>爆</div>" if hp_pct > 100 else ""}
+                                {"<div id='" + uid + "_badge_hp' class='bar-badge' style='left:" + f"{hp_end_pct:.1f}" + "%;'>爆</div>" if hp_over else ""}
                             </div>
                             <div id="{uid}_value_hp" class="stat-value">0.000</div>
                             <div id="{uid}_gain_hp" class="stat-gain">+0.000</div>
@@ -1814,7 +1762,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                             </div>
                             <div class="bar-track">
                                 <div id="{uid}_atk" class="bar-fill" style="width:{atk_start_pct:.1f}%; height:100%;"></div>
-                                {"<div id='" + uid + "_badge_atk' class='bar-badge' style='left:" + f"{atk_end_pct:.1f}" + "%;'>爆</div>" if atk_pct > 100 else ""}
+                                {"<div id='" + uid + "_badge_atk' class='bar-badge' style='left:" + f"{atk_end_pct:.1f}" + "%;'>爆</div>" if atk_over else ""}
                             </div>
                             <div id="{uid}_value_atk" class="stat-value">0.000</div>
                             <div id="{uid}_gain_atk" class="stat-gain">+0.000</div>
@@ -1826,7 +1774,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                             </div>
                             <div class="bar-track">
                                 <div id="{uid}_def" class="bar-fill" style="width:{def_start_pct:.1f}%; height:100%;"></div>
-                                {"<div id='" + uid + "_badge_def' class='bar-badge' style='left:" + f"{def_end_pct:.1f}" + "%;'>爆</div>" if def_pct > 100 else ""}
+                                {"<div id='" + uid + "_badge_def' class='bar-badge' style='left:" + f"{def_end_pct:.1f}" + "%;'>爆</div>" if def_over else ""}
                             </div>
                             <div id="{uid}_value_def" class="stat-value">0.000</div>
                             <div id="{uid}_gain_def" class="stat-gain">+0.000</div>
@@ -1838,7 +1786,7 @@ def render_one_reincarnation_result_card(selected_pet, grade, current_stats, res
                             </div>
                             <div class="bar-track">
                                 <div id="{uid}_spd" class="bar-fill" style="width:{spd_start_pct:.1f}%; height:100%;"></div>
-                                {"<div id='" + uid + "_badge_spd' class='bar-badge' style='left:" + f"{spd_end_pct:.1f}" + "%;'>爆</div>" if spd_pct > 100 else ""}
+                                {"<div id='" + uid + "_badge_spd' class='bar-badge' style='left:" + f"{spd_end_pct:.1f}" + "%;'>爆</div>" if spd_over else ""}
                             </div>
                             <div id="{uid}_value_spd" class="stat-value">0.000</div>
                             <div id="{uid}_gain_spd" class="stat-gain">+0.000</div>
@@ -2017,7 +1965,7 @@ def pet_card(pet_name):
         with stat2:
             st.markdown(
                 make_stat_card(
-                    "환생 후",
+                    "환생 후 최대",
                     row.get("post_hp", 0),
                     row.get("post_attack", 0),
                     row.get("post_defense", 0),
@@ -2171,7 +2119,7 @@ def show_ride_pet_info(selected_raid):
 
 def show_reincarnation_simulator():
     st.header("환생 시뮬레이터")
-    st.caption("※ 부모 세부 성장치 비율을 반영한 체감형 기능이며, 참고용으로 활용해주세요.")
+    st.caption("※ 공통배율 가중치 테이블 기반 체감형 기능이며, 참고용으로 활용해주세요.")
 
     pet_list = sorted(pets_df["pet_name"].dropna().unique().tolist())
     default_pet = "백호" if "백호" in pet_list else pet_list[0]
@@ -2299,7 +2247,11 @@ def show_reincarnation_simulator():
                     "hp_pct": one["hp_pct"],
                     "atk_pct": one["atk_pct"],
                     "def_pct": one["def_pct"],
-                    "spd_pct": one["spd_pct"]
+                    "spd_pct": one["spd_pct"],
+                    "hp_over": one["hp_over"],
+                    "atk_over": one["atk_over"],
+                    "def_over": one["def_over"],
+                    "spd_over": one["spd_over"],
                 },
                 pet_row=row
             )
@@ -2314,27 +2266,29 @@ def show_reincarnation_simulator():
                     unsafe_allow_html=True
                 )
 
+            st.markdown(f"#### 공통 배율: **x{one['uniform_rate']:.2f}**")
+
             st.markdown("#### 세부 환생 퍼센트")
             r1, r2, r3, r4 = st.columns(4)
 
             with r1:
                 st.markdown(
-                    f"체력 **{one['hp_pct']:.1f}%** {get_small_over_badge_html(one['hp_pct'])}",
+                    f"체력 **{one['hp_pct']:.1f}%** {get_small_over_badge_html(one.get('hp_over', False))}",
                     unsafe_allow_html=True
                 )
             with r2:
                 st.markdown(
-                    f"공격 **{one['atk_pct']:.1f}%** {get_small_over_badge_html(one['atk_pct'])}",
+                    f"공격 **{one['atk_pct']:.1f}%** {get_small_over_badge_html(one.get('atk_over', False))}",
                     unsafe_allow_html=True
                 )
             with r3:
                 st.markdown(
-                    f"방어 **{one['def_pct']:.1f}%** {get_small_over_badge_html(one['def_pct'])}",
+                    f"방어 **{one['def_pct']:.1f}%** {get_small_over_badge_html(one.get('def_over', False))}",
                     unsafe_allow_html=True
                 )
             with r4:
                 st.markdown(
-                    f"순발 **{one['spd_pct']:.1f}%** {get_small_over_badge_html(one['spd_pct'])}",
+                    f"순발 **{one['spd_pct']:.1f}%** {get_small_over_badge_html(one.get('spd_over', False))}",
                     unsafe_allow_html=True
                 )
 
@@ -2411,20 +2365,32 @@ def show_reincarnation_simulator():
             g4.metric("근접", f"{grade_counts['무지개 근접']}회")
             g5.metric("무지개", f"{grade_counts['무지개']}회")
 
-            over_hp = sum(1 for r in results if float(r.get("hp_pct", 0)) > 100)
-            over_atk = sum(1 for r in results if float(r.get("atk_pct", 0)) > 100)
-            over_def = sum(1 for r in results if float(r.get("def_pct", 0)) > 100)
-            over_spd = sum(1 for r in results if float(r.get("spd_pct", 0)) > 100)
+            over_hp = sum(1 for r in results if bool(r.get("hp_over", False)))
+            over_atk = sum(1 for r in results if bool(r.get("atk_over", False)))
+            over_def = sum(1 for r in results if bool(r.get("def_over", False)))
+            over_spd = sum(1 for r in results if bool(r.get("spd_over", False)))
 
-            st.markdown("#### 100% 초과 등장 횟수")
+            st.markdown("#### 爆 등장 횟수")
             o1, o2, o3, o4 = st.columns(4)
-            o1.metric("체력 100% 초과", f"{over_hp}회")
-            o2.metric("공격 100% 초과", f"{over_atk}회")
-            o3.metric("방어 100% 초과", f"{over_def}회")
-            o4.metric("순발 100% 초과", f"{over_spd}회")
+            o1.metric("체력 爆", f"{over_hp}회")
+            o2.metric("공격 爆", f"{over_atk}회")
+            o3.metric("방어 爆", f"{over_def}회")
+            o4.metric("순발 爆", f"{over_spd}회")
+
+            rate_counter = {}
+            for r in results:
+                rate = round(float(r.get("uniform_rate", 1.0)), 2)
+                rate_counter[rate] = rate_counter.get(rate, 0) + 1
+
+            sorted_rates = sorted(rate_counter.items(), key=lambda x: x[0])
+
+            st.markdown("#### 공통 배율 등장 횟수")
+            rate_text = " / ".join([f"x{rate:.2f}: {cnt}회" for rate, cnt in sorted_rates])
+            st.write(rate_text if rate_text else "배율 데이터 없음")
 
             st.markdown("#### 최고 결과")
             st.write(
+                f"공통배율 **x{best_result['uniform_rate']:.2f}** / "
                 f"총 성장 **{best_result['total_g']:.3f}** / "
                 f"체력 성장 **{best_result['hp_g']:.3f}** ({best_result['hp_pct']:.1f}%), "
                 f"공격 성장 **{best_result['atk_g']:.3f}** ({best_result['atk_pct']:.1f}%), "
@@ -2434,6 +2400,7 @@ def show_reincarnation_simulator():
 
             st.markdown("#### 최저 결과")
             st.write(
+                f"공통배율 **x{worst_result['uniform_rate']:.2f}** / "
                 f"총 성장 **{worst_result['total_g']:.3f}** / "
                 f"체력 성장 **{worst_result['hp_g']:.3f}** ({worst_result['hp_pct']:.1f}%), "
                 f"공격 성장 **{worst_result['atk_g']:.3f}** ({worst_result['atk_pct']:.1f}%), "
@@ -2444,7 +2411,7 @@ def show_reincarnation_simulator():
 
 # ---------- 상단 ----------
 st.title("스톤에이지 각성 초보용 펫 도감")
-st.caption("레이드별 추천 펫 + 환생 시뮬레이터 통합 Version 2.6.3 Mobile")
+st.caption("레이드별 추천 펫 + 환생 시뮬레이터 통합 Version 2.6.6 Weighted Uniform Fix")
 
 st.markdown("""
 <div style="padding: 10px 0 20px 0;">
